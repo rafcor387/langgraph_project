@@ -39,20 +39,44 @@ def travel_outspace(destination: str) -> str:
         return f"Destination '{destination}' is unknown. Please choose a valid space destination."
     
 @tool
+def travel_outspace(destination: str, discount: int = 0) -> str:
+    """Simulates traveling to a destination in outer space.
+        It has a list of known destinations: Mars, Moon, Jupiter, Saturn.
+        It is posible aplicate a discount code to lower the price of the ticket.
+    Args:
+        destination: The name of the destination to travel to.
+        discount: (Optional) The discount percentage to apply to the ticket price."""
+    
+    destinations_Ticketprice = {
+        "Mars": 500,
+        "Jupiter": 250.5,
+        "Moon": 150,
+        "Saturn" : 900
+    }
+
+    if discount > 0:
+        destinations_Ticketprice = {
+        "Mars": 500 - (discount * (500/100)),
+        "Jupiter": 250.5 - (discount * (250.5/100)),
+        "Moon": 150 - (discount * (150/100)),
+        "Saturn" : 900 - (discount * (900/100))
+        }
+        return destinations_Ticketprice.get(destination, f"There is a discount but the destination does not exist")
+    
+    else:
+        return destinations_Ticketprice.get(destination, f"There is not discount and the destination does not exist")
+
+@tool
 def check_discount(code: str) -> str:
     """Checks if a discount code is valid and returns the discount percentage.
     Args:
         code: The discount code to check."""
     
     valid_codes = {
-        "SAVE10": 10,
-        "SAVE20": 20,
-        "SAVE30": 30
+        "SAVE10": 2,
+        "SAVE20": 4,
+        "SAVE30": 7
     }
-    discount = valid_codes.get(code)
-    if discount:
-        return f"Discount code '{code}' is valid for {discount}% off."
-    else:
-        return f"Discount code '{code}' is invalid."
+    return valid_codes.get(code, f"The discount code {code} was invalid")
 
 tools = [find_number_by_name, delete_number_by_name, travel_outspace, check_discount]
