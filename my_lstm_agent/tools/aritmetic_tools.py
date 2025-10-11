@@ -14,9 +14,10 @@ def get_radiosonde(date: str) -> str:
         date: date in year-month-day YYYY-MM-DD format e.g 2018-12-29
     """
     radiosonde = get_radiosonde_fromDB(date)
+
     if radiosonde:
         data = calculos(radiosonde)
-        return f"this is the dictionary on python for the radiosondeo with date {date}: {data}"
+        return f"the data get to the date {date}: {data}"
     
     return f" the radiosonde with date {date} was not found"
 
