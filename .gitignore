@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+**/__pycache__/
+
+
+#github
+**/.github/
+
+**/.langgraph_api/
+.langgraph_api/
+
+**/static/
+
+**/tests/
+
+
+**/venv/
+/venv/
+
+*.env
+**/.env
+
+
+#Makefile
+**/Makefile
