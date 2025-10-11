@@ -1,16 +1,21 @@
 from langchain_core.tools import tool
-from utils.get_radiosonde import get_radiosonde_bydate
+from utils.get_radiosonde import get_radiosonde_fromDB
+from utils.calculations import calculos
 
 @tool
 def get_radiosonde(date: str) -> str:
     """Find a radiosonde from the database
-    return affirmative if radiosonde was find, else return not found
-    
+    if the radiosende was found return the next arrays: 
+        Pressure, temperature, dewpoint, wind_speed, wind_direction, height;
+        It also return date, launch_time, time.
+    else return not found
+
     Args:
-        date: date in year-month-day YY-M-D format e.g 2018-12-29
+        date: date in year-month-day YYYY-MM-DD format e.g 2018-12-29
     """
-    data = get_radiosonde_bydate(date)
-    if data:
+    radiosonde = get_radiosonde_fromDB(date)
+    if radiosonde:
+        data = calculos(radiosonde)
         return f"this is the dictionary on python for the radiosondeo with date {date}: {data}"
     
     return f" the radiosonde with date {date} was not found"
