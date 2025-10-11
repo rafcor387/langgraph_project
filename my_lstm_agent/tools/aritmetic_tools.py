@@ -1,4 +1,19 @@
 from langchain_core.tools import tool
+from utils.get_radiosonde import get_radiosonde_bydate
+
+@tool
+def get_radiosonde(date: str) -> str:
+    """Find a radiosonde from the database
+    return affirmative if radiosonde was find, else return not found
+    
+    Args:
+        date: date in year-month-day YY-M-D format e.g 2018-12-29
+    """
+    data = get_radiosonde_bydate(date)
+    if data:
+        return f"this is the dictionary on python for the radiosondeo with date {date}: {data}"
+    
+    return f" the radiosonde with date {date} was not found"
 
 @tool
 def find_number_by_name(name: str) -> int:
@@ -26,23 +41,10 @@ def delete_number_by_name(name: str) -> str:
         return f"Could not delete '{name}' as they were not found in the contact list."
     
 @tool
-def travel_outspace(destination: str) -> str:
-    """Simulates traveling to a destination in outer space.
-        It has a list of known destinations: Mars, Moon, Jupiter, Saturn.
-    Args:
-        destination: The name of the destination to travel to."""
-    
-    known_destinations = ["Mars", "Moon", "Jupiter", "Saturn"]
-    if destination in known_destinations:
-        return f"Ticket bought for {destination}!"
-    else:
-        return f"Destination '{destination}' is unknown. Please choose a valid space destination."
-    
-@tool
 def travel_outspace(destination: str, discount: int = 0) -> str:
     """Simulates traveling to a destination in outer space.
         It has a list of known destinations: Mars, Moon, Jupiter, Saturn.
-        It is posible aplicate a discount code to lower the price of the ticket.
+        It's optiocal aplicate a discount code to lower the price of the ticket.
     Args:
         destination: The name of the destination to travel to.
         discount: (Optional) The discount percentage to apply to the ticket price."""
@@ -79,4 +81,4 @@ def check_discount(code: str) -> str:
     }
     return valid_codes.get(code, f"The discount code {code} was invalid")
 
-tools = [find_number_by_name, delete_number_by_name, travel_outspace, check_discount]
+tools = [find_number_by_name, delete_number_by_name, travel_outspace, check_discount, get_radiosonde]

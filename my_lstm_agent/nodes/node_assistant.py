@@ -1,6 +1,6 @@
 from langgraph.graph import MessagesState
 from tools.aritmetic_tools import tools
-from models.openai import llm
+from config.openai import llm
 from prompt.general_prompt import sys_msg
 
 # Node
