@@ -17,7 +17,7 @@ def get_radiosonde(date: str) -> str:
 
     if radiosonde:
         data = calculos(radiosonde)
-        return f"the data get to the date {date}: {data}"
+        return f"the data obtain by date {date}: {data}"
     
     return f" the radiosonde with date {date} was not found"
 

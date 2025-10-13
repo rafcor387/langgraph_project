@@ -18,8 +18,6 @@ def get_radiosonde_fromDB(date: str):
             "wind_dir": doc.get("wind_dir", [])
         }
 
-        #radiosonde_calculations = calculos(radiosonde_data)
-
         return radiosonde_data
     else:
         return None
