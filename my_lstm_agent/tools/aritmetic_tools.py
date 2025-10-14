@@ -1,17 +1,23 @@
 from langchain_core.tools import tool
 from utils.get_radiosonde import get_radiosonde_fromDB
 from utils.calculations import calculos
+import pandas as pd
+import json    
+
 
 @tool
 def get_radiosonde(date: str) -> str:
     """Find a radiosonde from the database
-    if the radiosende was found return the next arrays: 
-        Pressure, temperature, dewpoint, wind_speed, wind_direction, height;
+    if the radiosende was found return the next values:
+    date, CAPE Superficie, CIn Superficie
         It also return date, launch_time, time.
     else return not found
 
     Args:
         date: date in year-month-day YYYY-MM-DD format e.g 2018-12-29
+    Return:
+        the return It must contain, in addition to the radiosonde data, 
+        its respective interpretation of the atmosphere based on the data obtained.
     """
     radiosonde = get_radiosonde_fromDB(date)
 
@@ -20,6 +26,32 @@ def get_radiosonde(date: str) -> str:
         return f"the data obtain by date {date}: {data}"
     
     return f" the radiosonde with date {date} was not found"
+
+@tool
+def get_radiosonde_from_dataset(date: str):
+    """Find a radiosonde from the dataset
+    if the radiosende was found return the next array: 
+        Pressure, temperature, dewpoint, wind_speed, wind_direction, height;
+        It also return date, launch_time, time.
+    else return not found
+
+    Args:
+        date: date in year-month-day YYYY-MM-DD format e.g 2018-12-29
+    """
+    df = pd.read_csv("../my_lstm_agent/dataset/labels.csv", parse_dates=["date"])
+
+    row = df.loc[df["date"] == date]
+
+    if row.empty:
+        return("No se encontró ningún registro con esa fecha.")
+    else:
+        # Convertir la primera fila al diccionario con esas columnas
+        data_full = row.iloc[0].to_dict()
+
+        data = json.dumps(data_full, indent=2)
+        # Imprimir bonito (opcional)
+        return f"at the end of your response, must ask if the user wants the data from radiosonde date 2018-12-01",data
+
 
 @tool
 def find_number_by_name(name: str) -> int:
@@ -48,7 +80,7 @@ def delete_number_by_name(name: str) -> str:
     
 @tool
 def travel_outspace(destination: str, discount: int = 0) -> str:
-    """Simulates traveling to a destination in outer space.
+    """Simulates traveling to a destination out space.
         It has a list of known destinations: Mars, Moon, Jupiter, Saturn.
         It's optiocal aplicate a discount code to lower the price of the ticket.
     Args:
@@ -87,4 +119,4 @@ def check_discount(code: str) -> str:
     }
     return valid_codes.get(code, f"The discount code {code} was invalid")
 
-tools = [find_number_by_name, delete_number_by_name, travel_outspace, check_discount, get_radiosonde]
+tools = [find_number_by_name, delete_number_by_name, travel_outspace, check_discount, get_radiosonde_from_dataset]
