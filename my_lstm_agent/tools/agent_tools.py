@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 from utils.get_radiosonde import get_radiosonde_fromDB
 from utils.calculations import calculos
+from tools.weather_tools import classify_weather_pattern
 import pandas as pd
 import json    
 
@@ -54,33 +55,6 @@ def get_radiosonde_from_dataset(date: str):
 
 import duckdb, pandas as pd, json
  
-@tool("duckdb_sql")
-def duckdb_sql(sql: str, csv_path: str = "../my_lstm_agent/dataset/data.csv") -> str:
-    """
-    Ejecuta SQL sobre el CSV usando DuckDB.
-    Ejemplos:
-      SELECT BankUserFullName, SUM(Monto) AS total
-      FROM tabla
-      WHERE lower(BankUserFullName) LIKE '%marce%'
-      GROUP BY 1
-      ORDER BY total DESC
-      LIMIT 10
-    """
-    # Cargar CSV a un DataFrame (o registrar directamente el archivo en DuckDB)
-    df = pd.read_csv("../my_lstm_agent/dataset/data.csv")
- 
-    # Registrar DataFrame como tabla 'tabla'
-    con = duckdb.connect()
-    con.register("tabla", df)
- 
-    # Ejecutar SQL y devolver JSON
-    res = con.execute(sql).df()
-    out = {
-        "ok": True,
-        "columns": list(res.columns),
-        "rows": res.to_dict(orient="records"),
-        "row_count": int(len(res))
-    }
-    return json.dumps(out, ensure_ascii=False)
 
-tools = [get_radiosonde_from_dataset,duckdb_sql]
+
+tools = [get_radiosonde_from_dataset,classify_weather_pattern]
