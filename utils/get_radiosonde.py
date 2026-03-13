@@ -1,4 +1,4 @@
-from config.mongodb import collection, client
+""" from config.mongodb import collection, client
 from utils.calculations import calculos
 
 def get_radiosonde_fromDB(date: str):
@@ -21,4 +21,4 @@ def get_radiosonde_fromDB(date: str):
         return radiosonde_data
     else:
         return None
-    
+     """

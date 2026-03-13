@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from utils.get_radiosonde import get_radiosonde_fromDB
+#from utils.get_radiosonde import get_radiosonde_fromDB
 from utils.calculations import calculos
 from tools.weather_tools import classify_weather_pattern
 import pandas as pd

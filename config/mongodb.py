@@ -1,4 +1,4 @@
-import os
+""" import os
 from dotenv import load_dotenv
 from pymongo.mongo_client import MongoClient
 
@@ -17,3 +17,4 @@ except Exception as e:
 
 db = client['test']       
 collection = db['radiosondeo']  
+ """
