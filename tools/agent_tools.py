@@ -89,6 +89,66 @@ def search_radiosondes(date: str) -> dict:
         "radiosondes": compact_results,
     }
 
+
+@tool
+def analyze_radiosonde(profile_id: int) -> dict:
+    """Obtiene el resumen general normalizado de un radiosondeo.
+
+    Primero debe obtenerse el profile_id con search_radiosondes. El backend
+    recupera el TSV desde Cloudflare R2, lo normaliza en memoria y devuelve
+    metadatos, control de calidad, cobertura, superficie, tope y ubicación de
+    lanzamiento. Esta herramienta todavía no calcula índices termodinámicos
+    de MetPy como CAPE, CIN, LCL, LFC o EL.
+
+    Args:
+        profile_id: Identificador entero positivo del radiosondeo.
+    """
+    if isinstance(profile_id, bool):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    try:
+        normalized_profile_id = int(profile_id)
+    except (TypeError, ValueError):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    if normalized_profile_id <= 0 or str(profile_id).strip() != str(normalized_profile_id):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    api_base_url = os.getenv("RADIOSONDE_API_URL", "http://localhost:8000").rstrip("/")
+    url = f"{api_base_url}/feature/radiosondes/{normalized_profile_id}/profile/"
+    request = Request(url, headers={"Accept": "application/json"})
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            detail = error_payload.get(
+                "error",
+                error_payload.get("detail", str(error_payload)),
+            )
+        except Exception:
+            detail = str(exc)
+        return {
+            "error": detail,
+            "status_code": exc.code,
+            "profile_id": normalized_profile_id,
+        }
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "error": f"No se pudo analizar el radiosondeo: {exc}",
+            "profile_id": normalized_profile_id,
+        }
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("profile"), dict):
+        return {
+            "error": "El servicio devolvió una respuesta de análisis inválida.",
+            "profile_id": normalized_profile_id,
+        }
+
+    return payload
+
 @tool
 def diagram_skew_t(fecha: str):
     """
@@ -256,6 +316,7 @@ def get_radiosonde_from_disk(date:str):
 
 tools = [
     search_radiosondes,
+    analyze_radiosonde,
     get_radiosonde_from_disk,
     classify_weather_pattern,
     diagram_skew_t,
