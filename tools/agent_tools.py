@@ -1,23 +1,11 @@
 from langchain_core.tools import tool
-#from utils.get_radiosonde import get_radiosonde_fromDB
-from utils.calculations import calculos
 from tools.weather_tools import classify_weather_pattern
 from datetime import date as date_type
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-import pandas as pd
 import json    
 import os
-import io
-import base64
-import matplotlib
-import matplotlib.pyplot as plt
-from metpy.plots import SkewT
-from metpy.calc import parcel_profile, lcl, lfc, el
-from metpy.units import units
-
-matplotlib.use('Agg')
 
 
 @tool
@@ -214,104 +202,138 @@ def classify_radiosonde_stability(profile_id: int) -> dict:
     return payload
 
 @tool
-def diagram_skew_t(fecha: str):
-    """
-    Genera un diagrama Skew-T visual a partir de datos de radiosondeo.
-    
+def generate_skew_t(profile_id: int) -> dict:
+    """Genera y publica el descriptor de un diagrama Skew-T.
+
+    Usa el profile_id devuelto por search_radiosondes. Django recupera y
+    normaliza el TSV, genera el PNG completo con MetPy, lo cachea de forma
+    privada en R2 y devuelve rutas relativas para visualizarlo o descargarlo,
+    además de diagnósticos numéricos SB/ML/MU CAPE-CIN, LCL, LFC, EL, CCL,
+    Lifted Index, agua precipitable y temperatura convectiva. La herramienta
+    nunca incluye la imagen como Base64 ni expone el bucket u object_key.
+
     Args:
-        fecha (str): La fecha del radiosondeo en formato estricto 'YYYY-MM-DD' 
-                     (Ejemplo: '2024-04-03'). No incluir la hora.
+        profile_id: Identificador entero positivo del radiosondeo.
     """
-    # --- PASO 1: Obtener el radiosondeo ---
-    nombre_archivo = f"{fecha}-12Z.csv"
-    
-    # Usamos tu ruta corregida
-    ruta_archivo = f"../my_lstm_agent/radiosonde/{nombre_archivo}"
+    if isinstance(profile_id, bool):
+        return {"error": "profile_id debe ser un número entero positivo."}
 
-    print(f"DEBUG: Buscando archivo en: {ruta_archivo}") 
-
-    if not os.path.exists(ruta_archivo):
-        return f"Error: No se encontró el archivo de radiosondeo en la ruta {ruta_archivo}. Verifica la fecha."
-
-    # --- PASO 2: Generar el gráfico con MetPy ---
     try:
-        df = pd.read_csv(ruta_archivo)
-        df.columns = df.columns.str.strip()
+        normalized_profile_id = int(profile_id)
+    except (TypeError, ValueError):
+        return {"error": "profile_id debe ser un número entero positivo."}
 
-        p = df['pressure_hPa'].values * units.hPa
-        t = df['temp_C'].values * units.degC 
-        td = df['dewpoint_C'].values * units.degC
+    if normalized_profile_id <= 0 or str(profile_id).strip() != str(normalized_profile_id):
+        return {"error": "profile_id debe ser un número entero positivo."}
 
-        prof = parcel_profile(p, t[0], td[0])
-        
-        fig = plt.figure(figsize=(9, 9))
-        skew = SkewT(fig)
+    api_base_url = os.getenv("RADIOSONDE_API_URL", "http://localhost:8000").rstrip("/")
+    url = f"{api_base_url}/feature/radiosondes/{normalized_profile_id}/skew-t/"
+    request = Request(url, headers={"Accept": "application/json"})
 
-        skew.plot_dry_adiabats()
-        skew.plot_moist_adiabats()
-        skew.plot_mixing_lines()
-
-        skew.plot(p, t, 'red', label="Temperatura")
-        skew.plot(p, td, 'green', label="Punto de Rocío")
-        skew.plot(p, prof.to('degC'), 'black', label='Parcela')
-
-        skew.shade_cin(p, t, prof)
-        skew.shade_cape(p, t, prof)
-
-        lcl_pressure, lcl_temperature = lcl(p[0], t[0], td[0])
-        skew.ax.plot(lcl_temperature, lcl_pressure, 'ko', markerfacecolor='cyan', label='LCL')
-
+    try:
+        with urlopen(request, timeout=60) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
         try:
-            lfc_pressure, lfc_temperature = lfc(p, t, td)
-            el_pressure, el_temperature = el(p, t, td)
-            if lfc_pressure: 
-                skew.ax.plot(lfc_temperature, lfc_pressure, 'ko', markerfacecolor='magenta', label='LFC')
-            if el_pressure: 
-                skew.ax.plot(el_temperature, el_pressure, 'ko', markerfacecolor='orange', label='EL')
-        except:
-            pass 
-
-        skew.ax.set_ylim(1000, 100)
-        skew.ax.set_xlim(-40, 40)
-        plt.title(f"Diagrama Skew-T: {fecha} (12Z)")
-        plt.legend()
-        
-        # --- PASO 3: CONVERTIR A BASE64 Y RETORNAR JSON ---
-        
-        # 1. Crear buffer en memoria
-        buf = io.BytesIO()
-        
-        # 2. Guardar figura en el buffer
-        # bbox_inches='tight' recorta los bordes blancos sobrantes para que se vea mejor en web
-        fig.savefig(buf, format='png', bbox_inches='tight')
-        
-        # 3. Volver al inicio del buffer
-        buf.seek(0)
-        
-        # 4. Codificar a Base64
-        img_str = base64.b64encode(buf.read()).decode('utf-8')
-        
-        # 5. Limpiar memoria (Vital para no saturar el servidor)
-        plt.close(fig)
-        buf.close()
-
-        # 6. Crear estructura JSON para el Frontend
-        # Esto es lo que leerá React para saber que tiene que pintar una imagen
-        respuesta_json = {
-            "type": "skew_t_diagram", 
-            "image_base64": f"data:image/png;base64,{img_str}",
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            detail = error_payload.get(
+                "error",
+                error_payload.get("detail", str(error_payload)),
+            )
+        except Exception:
+            detail = str(exc)
+        return {
+            "error": detail,
+            "status_code": exc.code,
+            "profile_id": normalized_profile_id,
+        }
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "error": f"No se pudo generar el Skew-T: {exc}",
+            "profile_id": normalized_profile_id,
         }
 
-        # Retornamos el JSON como string
-        return json.dumps(respuesta_json)
+    if (
+        not isinstance(payload, dict)
+        or payload.get("type") != "skew_t_diagram"
+        or not isinstance(payload.get("image_path"), str)
+    ):
+        return {
+            "error": "El servicio devolvió un descriptor Skew-T inválido.",
+            "profile_id": normalized_profile_id,
+        }
 
-    except Exception as e:
-        return f"Error procesando los datos del archivo {nombre_archivo}: {str(e)}"
+    return payload
+
+
+@tool
+def generate_hodograph(profile_id: int) -> dict:
+    """Genera y publica el descriptor de un hodógrafo.
+
+    Usa el profile_id devuelto por search_radiosondes. Django recupera y
+    normaliza el TSV, genera el PNG con MetPy, lo cachea de forma privada en R2
+    y devuelve rutas relativas para visualizarlo o descargarlo. Incluye
+    diagnósticos de viento en superficie, viento máximo y cizalladura vectorial
+    0–1, 0–3 y 0–6 km AGL. No expone Base64, bucket ni object_key.
+
+    Args:
+        profile_id: Identificador entero positivo del radiosondeo.
+    """
+    if isinstance(profile_id, bool):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    try:
+        normalized_profile_id = int(profile_id)
+    except (TypeError, ValueError):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    if normalized_profile_id <= 0 or str(profile_id).strip() != str(normalized_profile_id):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    api_base_url = os.getenv("RADIOSONDE_API_URL", "http://localhost:8000").rstrip("/")
+    url = f"{api_base_url}/feature/radiosondes/{normalized_profile_id}/hodograph/"
+    request = Request(url, headers={"Accept": "application/json"})
+
+    try:
+        with urlopen(request, timeout=60) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            detail = error_payload.get(
+                "error",
+                error_payload.get("detail", str(error_payload)),
+            )
+        except Exception:
+            detail = str(exc)
+        return {
+            "error": detail,
+            "status_code": exc.code,
+            "profile_id": normalized_profile_id,
+        }
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "error": f"No se pudo generar el hodógrafo: {exc}",
+            "profile_id": normalized_profile_id,
+        }
+
+    if (
+        not isinstance(payload, dict)
+        or payload.get("type") != "hodograph_diagram"
+        or not isinstance(payload.get("image_path"), str)
+    ):
+        return {
+            "error": "El servicio devolvió un descriptor de hodógrafo inválido.",
+            "profile_id": normalized_profile_id,
+        }
+
+    return payload
 
 tools = [
     search_radiosondes,
     analyze_radiosonde,
     classify_radiosonde_stability,
     classify_weather_pattern,
-    diagram_skew_t,
+    generate_skew_t,
+    generate_hodograph,
 ]
