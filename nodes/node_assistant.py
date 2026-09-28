@@ -1,8 +1,8 @@
 import json
 from langgraph.graph import MessagesState
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from tools.agent_tools import tools
-from config.openai import llm
+from config.openai import GROQ_MODEL, llm
 from prompt.general_prompt import sys_msg
 
 llm_tools = llm.bind_tools(tools)
@@ -36,6 +36,15 @@ def assistant(state: MessagesState):
             messages_for_llm.append(msg)
 
 
-    response = llm_tools.invoke([sys_msg] + messages_for_llm)
+    try:
+        response = llm_tools.invoke([sys_msg] + messages_for_llm)
+    except Exception:
+        response = AIMessage(
+            content=(
+                f"No se pudo ejecutar el modelo de Groq configurado "
+                f"('{GROQ_MODEL}'). Verifica que GROQ_MODEL sea válido, que "
+                "GROQ_API_KEY sea correcta y que el modelo esté disponible."
+            )
+        )
     
     return {"messages": [response]}
