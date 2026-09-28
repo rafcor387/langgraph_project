@@ -85,8 +85,9 @@ def analyze_radiosonde(profile_id: int) -> dict:
     Primero debe obtenerse el profile_id con search_radiosondes. El backend
     recupera el TSV desde Cloudflare R2, lo normaliza en memoria y devuelve
     metadatos, control de calidad, cobertura, superficie, tope y ubicación de
-    lanzamiento. Esta herramienta todavía no calcula índices termodinámicos
-    de MetPy como CAPE, CIN, LCL, LFC o EL.
+    lanzamiento. Se usa para consultar, inspeccionar o resumir los datos del
+    perfil. No clasifica la estabilidad atmosférica; para esa intención se usa
+    classify_radiosonde_stability.
 
     Args:
         profile_id: Identificador entero positivo del radiosondeo.
@@ -147,7 +148,9 @@ def classify_radiosonde_stability(profile_id: int) -> dict:
     capa mezclada, gradientes térmicos, N² e inversión superficial. Después
     devuelve ejes separados de estabilidad estática, estabilidad de parcela,
     potencial convectivo e inversión superficial. La categoría global es sólo
-    un resumen y puede ser "perfil mixto". No usa el modelo LSTM temporal.
+    un resumen y puede ser "perfil mixto". Se usa cuando el usuario pide una
+    clasificación o interpretación de estabilidad, no para una consulta
+    general de los datos. No usa el modelo LSTM temporal.
 
     Args:
         profile_id: Identificador entero positivo del radiosondeo.
