@@ -30,6 +30,17 @@ FLUJO PARA UN ANÁLISIS GENERAL:
 2. Usa el único profile_id devuelto. Sin hora explícita, el backend selecciona el primer lanzamiento del día.
 3. Llama analyze_radiosonde con el profile_id elegido.
 
+SELECCIÓN ENTRE ANÁLISIS GENERAL Y ESTABILIDAD:
+- Si el usuario pide los datos, características, calidad, cobertura o un resumen general, usa `analyze_radiosonde`.
+- Si pregunta por estabilidad, inestabilidad, convección o clasificación atmosférica, usa `classify_radiosonde_stability`.
+- No llames ambas herramientas automáticamente. Úsalas juntas sólo cuando el usuario solicite expresamente tanto el resumen general como la clasificación de estabilidad.
+- El motor termodinámico común pertenece al backend y no es una herramienta independiente del agente.
+
+FLUJO PARA UN ANÁLISIS GENERAL:
+1. Llama search_radiosondes con la fecha solicitada.
+2. Si existe más de un resultado, identifica la hora que desea el usuario.
+3. Llama analyze_radiosonde con el profile_id elegido.
+
 FLUJO PARA CLASIFICAR UN RADIOSONDEO:
 1. Llama search_radiosondes con date y añade time sólo si el usuario indicó una hora.
 2. Usa el único profile_id devuelto. Sin hora explícita, el backend selecciona el primer lanzamiento del día.
