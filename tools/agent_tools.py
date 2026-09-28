@@ -149,6 +149,70 @@ def analyze_radiosonde(profile_id: int) -> dict:
 
     return payload
 
+
+@tool
+def classify_radiosonde_stability(profile_id: int) -> dict:
+    """Diagnostica por capas la estabilidad de un radiosondeo de La Paz.
+
+    Usa el profile_id devuelto por search_radiosondes. El backend descarga el
+    TSV desde R2, lo normaliza y calcula con MetPy CAPE/CIN de superficie y de
+    capa mezclada, gradientes térmicos, N² e inversión superficial. Después
+    devuelve ejes separados de estabilidad estática, estabilidad de parcela,
+    potencial convectivo e inversión superficial. La categoría global es sólo
+    un resumen y puede ser "perfil mixto". No usa el modelo LSTM temporal.
+
+    Args:
+        profile_id: Identificador entero positivo del radiosondeo.
+    """
+    if isinstance(profile_id, bool):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    try:
+        normalized_profile_id = int(profile_id)
+    except (TypeError, ValueError):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    if normalized_profile_id <= 0 or str(profile_id).strip() != str(normalized_profile_id):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    api_base_url = os.getenv("RADIOSONDE_API_URL", "http://localhost:8000").rstrip("/")
+    url = f"{api_base_url}/feature/radiosondes/{normalized_profile_id}/stability/"
+    request = Request(url, headers={"Accept": "application/json"})
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            detail = error_payload.get(
+                "error",
+                error_payload.get("detail", str(error_payload)),
+            )
+        except Exception:
+            detail = str(exc)
+        return {
+            "error": detail,
+            "status_code": exc.code,
+            "profile_id": normalized_profile_id,
+        }
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "error": f"No se pudo clasificar el radiosondeo: {exc}",
+            "profile_id": normalized_profile_id,
+        }
+
+    if not isinstance(payload, dict) or not isinstance(
+        payload.get("classification"),
+        dict,
+    ):
+        return {
+            "error": "El servicio devolvió una clasificación inválida.",
+            "profile_id": normalized_profile_id,
+        }
+
+    return payload
+
 @tool
 def diagram_skew_t(fecha: str):
     """
@@ -244,80 +308,10 @@ def diagram_skew_t(fecha: str):
     except Exception as e:
         return f"Error procesando los datos del archivo {nombre_archivo}: {str(e)}"
 
-@tool
-def get_radiosonde(date: str) -> str:
-    """Find a radiosonde from the database
-    if the radiosende was found return the next values:
-    date, CAPE Superficie, CIn Superficie
-        It also return date, launch_time, time.
-    else return not found
-
-    Args:
-        date: date in year-month-day YYYY-MM-DD format e.g 2018-12-29
-    Return:
-        the return It must contain, in addition to the radiosonde data, 
-        its respective interpretation of the atmosphere based on the data obtained.
-    """
-    radiosonde = get_radiosonde_fromDB(date)
-
-    if radiosonde:
-        data = calculos(radiosonde)
-        return f"the data obtain by date {date}: {data}"
-    
-    return f" the radiosonde with date {date} was not found"
-
-@tool
-def get_radiosonde_from_dataset(date: str):
-    """Find a radiosonde from the dataset
-    if the radiosende was found return the next array: 
-        Pressure, temperature, dewpoint, wind_speed, wind_direction, height;
-        It also return date, launch_time, time.
-    else return not found
-
-    Args:
-        date: date in year-month-day YYYY-MM-DD format e.g 2018-12-29
-    """
-    df = pd.read_csv("./dataset/labels.csv", parse_dates=["date"])
-
-    row = df.loc[df["date"] == date]
-
-    if row.empty:
-        return("No se encontró ningún registro con esa fecha.")
-    else:
-        # Convertir la primera fila al diccionario con esas columnas
-        data_full = row.iloc[0].to_dict()
-
-        data = json.dumps(data_full, indent=2)
-        # Imprimir bonito (opcional)
-        return f"at the end of your response, must ask if the user wants the data from radiosonde date 2018-12-01",data
-
-@tool
-def get_radiosonde_from_disk(date:str):
-    """
-    Busca y lee un archivo de radiosondeo en formato TSV desde el disco local.
-    Args:
-        date (str): Fecha en formato 'DDMMYYYY' (ejemplo: 31122018 = 31 de diciembre de 2018).
-    """
-    nombre_archivo = f"{date}EDT.tsv"
-    #directorio = r"C:\Users\rafco\proyecto_grado\radiosonda_tsv"
-    directorio = r"C:\Users\rafco\proyecto_grado\sistema\cloudflare_r2\datos"
-    ruta_completa = os.path.join(directorio, nombre_archivo)
-
-    if not os.path.exists(ruta_completa):
-        return f"No se encontró el archivo para la fecha {date} en la ruta: {ruta_completa}"
-
-    try:
-        df = pd.read_csv(ruta_completa, sep='\t')
-        datos_json = df.head(20).to_json(orient="records")
-        return f"Los primeros 20 datos encontrados para {date}:\n{datos_json}"
-
-    except Exception as e:
-        return f"Error al leer el archivo {nombre_archivo}: {str(e)}"
-
 tools = [
     search_radiosondes,
     analyze_radiosonde,
-    get_radiosonde_from_disk,
+    classify_radiosonde_stability,
     classify_weather_pattern,
     diagram_skew_t,
 ]
