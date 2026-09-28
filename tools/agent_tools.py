@@ -201,6 +201,70 @@ def classify_radiosonde_stability(profile_id: int) -> dict:
 
     return payload
 
+
+@tool
+def analyze_wind(profile_id: int) -> dict:
+    """Analiza el perfil vertical de viento de un radiosondeo con MetPy.
+
+    Usa el profile_id devuelto por search_radiosondes. Devuelve viento de
+    superficie y máximo, viento medio y cizalladura 0–1/0–3/0–6 km AGL,
+    movimiento de tormenta Bunkers y helicidad relativa a la tormenta cuando
+    la cobertura lo permite. No genera una imagen; para eso usa
+    generate_hodograph.
+
+    Args:
+        profile_id: Identificador entero positivo del radiosondeo.
+    """
+    if isinstance(profile_id, bool):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    try:
+        normalized_profile_id = int(profile_id)
+    except (TypeError, ValueError):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    if normalized_profile_id <= 0 or str(profile_id).strip() != str(normalized_profile_id):
+        return {"error": "profile_id debe ser un número entero positivo."}
+
+    api_base_url = os.getenv("RADIOSONDE_API_URL", "http://localhost:8000").rstrip("/")
+    url = f"{api_base_url}/feature/radiosondes/{normalized_profile_id}/wind/"
+    request = Request(url, headers={"Accept": "application/json"})
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            detail = error_payload.get(
+                "error",
+                error_payload.get("detail", str(error_payload)),
+            )
+        except Exception:
+            detail = str(exc)
+        return {
+            "error": detail,
+            "status_code": exc.code,
+            "profile_id": normalized_profile_id,
+        }
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "error": f"No se pudo analizar el viento: {exc}",
+            "profile_id": normalized_profile_id,
+        }
+
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("surface_wind"), dict)
+        or not isinstance(payload.get("layers"), dict)
+    ):
+        return {
+            "error": "El servicio devolvió un análisis de viento inválido.",
+            "profile_id": normalized_profile_id,
+        }
+
+    return payload
+
 @tool
 def generate_skew_t(profile_id: int) -> dict:
     """Genera y publica el descriptor de un diagrama Skew-T.
@@ -333,6 +397,7 @@ tools = [
     search_radiosondes,
     analyze_radiosonde,
     classify_radiosonde_stability,
+    analyze_wind,
     classify_weather_pattern,
     generate_skew_t,
     generate_hodograph,
