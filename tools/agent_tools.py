@@ -2,6 +2,10 @@ from langchain_core.tools import tool
 #from utils.get_radiosonde import get_radiosonde_fromDB
 from utils.calculations import calculos
 from tools.weather_tools import classify_weather_pattern
+from datetime import date as date_type
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 import pandas as pd
 import json    
 import os
@@ -14,6 +18,76 @@ from metpy.calc import parcel_profile, lcl, lfc, el
 from metpy.units import units
 
 matplotlib.use('Agg')
+
+
+@tool
+def search_radiosondes(date: str) -> dict:
+    """Busca los radiosondeos de La Paz disponibles para una fecha.
+
+    Args:
+        date: Fecha exacta en formato YYYY-MM-DD, por ejemplo 2018-05-14.
+
+    Returns:
+        Un objeto con count y una lista radiosondes. Cada elemento contiene
+        profile_id, date, time y observed_at. Esta herramienta no descarga el
+        archivo TSV.
+    """
+    try:
+        normalized_date = date_type.fromisoformat(date).isoformat()
+    except (TypeError, ValueError):
+        return {
+            "error": "La fecha debe tener el formato YYYY-MM-DD.",
+            "count": 0,
+            "radiosondes": [],
+        }
+
+    api_base_url = os.getenv("RADIOSONDE_API_URL", "http://localhost:8000").rstrip("/")
+    query = urlencode({"date": normalized_date})
+    url = f"{api_base_url}/feature/radiosondes/search/?{query}"
+    request = Request(url, headers={"Accept": "application/json"})
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8")
+        except Exception:
+            detail = str(exc)
+        return {
+            "error": f"El servicio de radiosondeos respondió HTTP {exc.code}: {detail}",
+            "count": 0,
+            "radiosondes": [],
+        }
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "error": f"No se pudo consultar el servicio de radiosondeos: {exc}",
+            "count": 0,
+            "radiosondes": [],
+        }
+
+    radiosondes = payload.get("radiosondes")
+    if not isinstance(radiosondes, list):
+        return {
+            "error": "El servicio devolvió una respuesta inválida.",
+            "count": 0,
+            "radiosondes": [],
+        }
+
+    # Se filtra explícitamente la salida para no exponer bucket u object_key.
+    compact_results = [
+        {
+            "profile_id": item.get("profile_id"),
+            "date": item.get("date"),
+            "time": item.get("time"),
+            "observed_at": item.get("observed_at"),
+        }
+        for item in radiosondes
+    ]
+    return {
+        "count": len(compact_results),
+        "radiosondes": compact_results,
+    }
 
 @tool
 def diagram_skew_t(fecha: str):
@@ -143,7 +217,7 @@ def get_radiosonde_from_dataset(date: str):
     Args:
         date: date in year-month-day YYYY-MM-DD format e.g 2018-12-29
     """
-    df = pd.read_csv("../my_lstm_agent/dataset/labels.csv", parse_dates=["date"])
+    df = pd.read_csv("./dataset/labels.csv", parse_dates=["date"])
 
     row = df.loc[df["date"] == date]
 
@@ -157,5 +231,32 @@ def get_radiosonde_from_dataset(date: str):
         # Imprimir bonito (opcional)
         return f"at the end of your response, must ask if the user wants the data from radiosonde date 2018-12-01",data
 
+@tool
+def get_radiosonde_from_disk(date:str):
+    """
+    Busca y lee un archivo de radiosondeo en formato TSV desde el disco local.
+    Args:
+        date (str): Fecha en formato 'DDMMYYYY' (ejemplo: 31122018 = 31 de diciembre de 2018).
+    """
+    nombre_archivo = f"{date}EDT.tsv"
+    #directorio = r"C:\Users\rafco\proyecto_grado\radiosonda_tsv"
+    directorio = r"C:\Users\rafco\proyecto_grado\sistema\cloudflare_r2\datos"
+    ruta_completa = os.path.join(directorio, nombre_archivo)
 
-tools = [get_radiosonde_from_dataset,classify_weather_pattern,diagram_skew_t]
+    if not os.path.exists(ruta_completa):
+        return f"No se encontró el archivo para la fecha {date} en la ruta: {ruta_completa}"
+
+    try:
+        df = pd.read_csv(ruta_completa, sep='\t')
+        datos_json = df.head(20).to_json(orient="records")
+        return f"Los primeros 20 datos encontrados para {date}:\n{datos_json}"
+
+    except Exception as e:
+        return f"Error al leer el archivo {nombre_archivo}: {str(e)}"
+
+tools = [
+    search_radiosondes,
+    get_radiosonde_from_disk,
+    classify_weather_pattern,
+    diagram_skew_t,
+]
