@@ -14,7 +14,6 @@ HERRAMIENTAS DISPONIBLES:
 7. `generate_hodograph`: Recibe el profile_id encontrado por search_radiosondes, genera/cachea un hodógrafo 0–12 km AGL y devuelve rutas relativas para visualizarlo y descargarlo, junto con viento de superficie, viento máximo y cizalladura 0–1, 0–3 y 0–6 km. No escribas ni reproduzcas la imagen como Base64.
 8. `generate_radiosonde_report`: Recibe start_date y end_date inclusivas, con time opcional, y solicita un PDF agregado de hasta 366 días. El backend procesa los perfiles secuencialmente, guarda el PDF en R2 y devuelve una tarjeta de estado; no busques ni analices cada perfil manualmente antes de usarla.
 9. `get_radiosonde_report_status`: Consulta report_id cuando el usuario pide comprobar un informe que sigue pendiente. El frontend también actualiza automáticamente la tarjeta.
-10. `get_radiosonde_from_disk`: Herramienta temporal para leer un radiosondeo desde el disco local.
 
 SELECCIÓN ENTRE ANÁLISIS GENERAL Y ESTABILIDAD:
 - Si el usuario sólo pide qué radiosondeos existen en una fecha, responde con el resultado de `search_radiosondes` y no descargues los perfiles.
