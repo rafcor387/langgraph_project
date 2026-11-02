@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from tools.weather_tools import classify_weather_pattern
+from tools.pattern_assignment import assign_weather_pattern
 from datetime import date as date_type, datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -538,7 +538,8 @@ tools = [
     analyze_radiosonde,
     classify_radiosonde_stability,
     analyze_wind,
-    classify_weather_pattern,
+    #classify_weather_pattern,
+    assign_weather_pattern,
     generate_skew_t,
     generate_hodograph,
     generate_radiosonde_report,
