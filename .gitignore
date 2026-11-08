@@ -30,3 +30,4 @@ radiosonde/
 dataset/weather_pattern_assignments.csv.lock
 dataset/weather_pattern_assignments.csv.*.tmp
 
+dataset/weather_pattern_assignments.csv
